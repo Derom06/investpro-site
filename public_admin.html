@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/> 
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin - InvestPro</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Admin Backoffice</h1>
+    <div id="loginArea">
+      <input id="adminEmail" placeholder="admin email" />
+      <input id="adminPass" placeholder="password" />
+      <button id="adminLogin">Login</button>
+    </div>
+    <div id="adminApp" style="display:none">
+      <h2>Pending Deposits</h2>
+      <div id="deposits"></div>
+      <h2>Pending Withdrawals</h2>
+      <div id="withdrawals"></div>
+    </div>
+  </div>
+  <script>
+    document.getElementById('adminLogin').onclick = async ()=>{
+      const email = document.getElementById('adminEmail').value;
+      const pass = document.getElementById('adminPass').value;
+      const res = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email, password: pass})});
+      const j = await res.json();
+      if(j.token){
+        localStorage.setItem('adminToken', j.token);
+        document.getElementById('loginArea').style.display='none';
+        document.getElementById('adminApp').style.display='block';
+        loadAdmin();
+      } else alert(j.error||'Login failed');
+    }
+    async function loadAdmin(){
+      const t = localStorage.getItem('adminToken');
+      const dres = await fetch('/api/admin/deposits', {headers:{Authorization:'Bearer '+t}}).then(r=>r.json());
+      const wres = await fetch('/api/admin/withdrawals', {headers:{Authorization:'Bearer '+t}}).then(r=>r.json());
+      const dd = document.getElementById('deposits'); dd.innerHTML='';
+      dres.forEach(d=>{
+        const div = document.createElement('div'); div.className='card';
+        div.innerHTML = `<b>${d.user_email}</b> - ${d.product_name} - ${d.amount}f - ${d.payment_method} <button onclick="confirmDeposit(${d.id})">Confirm</button>`;
+        dd.appendChild(div);
+      });
+      const ww = document.getElementById('withdrawals'); ww.innerHTML='';
+      wres.forEach(w=>{
+        const div = document.createElement('div'); div.className='card';
+        div.innerHTML = `<b>${w.user_email}</b> - ${w.amount}f - ${w.payout_info} <button onclick="approveW(${w.id})">Approve</button> <button onclick="denyW(${w.id})">Deny</button>`;
+        ww.appendChild(div);
+      });
+    }
+    window.confirmDeposit = async (id)=>{
+      const t = localStorage.getItem('adminToken');
+      await fetch('/api/admin/deposits/'+id+'/confirm', {method:'POST', headers:{Authorization:'Bearer '+t}}).then(r=>r.json()).then(()=>loadAdmin());
+    }
+    window.approveW = async (id)=>{ const t=localStorage.getItem('adminToken'); await fetch('/api/admin/withdrawals/'+id+'/approve',{method:'POST', headers:{Authorization:'Bearer '+t}}).then(()=>loadAdmin()); }
+    window.denyW = async (id)=>{ const t=localStorage.getItem('adminToken'); await fetch('/api/admin/withdrawals/'+id+'/deny',{method:'POST', headers:{Authorization:'Bearer '+t}}).then(()=>loadAdmin()); }
+  </script>
+</body>
+</html>
